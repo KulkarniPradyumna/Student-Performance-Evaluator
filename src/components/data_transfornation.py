@@ -12,8 +12,10 @@ from sklearn.preprocessing import OneHotEncoder, StandardScaler
 from src.exception import CustomException
 from src.logger import logging
 
+from src.utils import save_obj
+
 class DataTransformationConfig:
-    preprocessor_obj_file_path=os.join('artifact', 'preprocessor.pkl')
+    preprocessor_obj_file_path=os.path.join('artifact', 'preprocessor.pkl')
 
 class DataTransformation:
     def __init__(self):
@@ -27,12 +29,12 @@ class DataTransformation:
                 'race/ethnicity',
                 'parental level of education',
                 'lunch',
-                'test preperation course'
+                'test preparation course'
             ]
             num_pipeline=Pipeline(
                 steps=[
                     ('imputer', SimpleImputer(strategy='median')),
-                    ('scaler', StandardScaler())
+                    ('scaler', StandardScaler(with_mean=False))
                 ]
             )
 
@@ -40,7 +42,7 @@ class DataTransformation:
                 steps=[
                     ('imputer', SimpleImputer(strategy='most_frequent')),
                     ('one_hot_encoder', OneHotEncoder()),
-                    ('scaler', StandardScaler())
+                    ('scaler', StandardScaler(with_mean=False))
                 ]
             
             )
@@ -70,6 +72,37 @@ class DataTransformation:
 
             preprocessing_obj=self.get_data_transformer_obj()
 
+            target_column = "math score"
+            numerical_columns = ['reading score', 'writing score']
+
+            input_features_train_df = train_df.drop(columns=[target_column], axis=1)
+            target_features_train_df = train_df[target_column]
+
+            input_features_test_data = test_df.drop(columns=[target_column], axis=1)
+            target_features_test_data = test_df[target_column]
             
-        except:
-            pass
+            logging.info("Applying preprocessing objext for test and train data")
+            
+            input_feature_train_arr=preprocessing_obj.fit_transform(input_features_train_df)
+            input_feature_test_arr=preprocessing_obj.transform(input_features_test_data)
+
+            train_arr = np.c_[input_feature_train_arr, np.array(target_features_train_df)]
+            test_arr = np.c_[input_feature_test_arr, np.array(target_features_test_data)]
+            
+            logging.info("Saved preprocessing object")
+
+            save_obj(
+                file_path=self.data_transformation_config.preprocessor_obj_file_path,
+                obj=preprocessing_obj
+            )
+
+            return(
+                train_arr,
+                test_arr,
+                self.data_transformation_config.preprocessor_obj_file_path
+            )
+
+
+
+        except Exception as e:
+            raise CustomException(e, sys)
